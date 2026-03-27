@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   HISTORY: "channel_history_v1",
   THEME: "theme_preference_v1",
   SLEEP_TIMER: "sleep_timer_v1",
+  SLEEP_TIMER_COUNTER: "sleep_timer_counter_v1",
 };
 
 export const SLEEP_TIMER_PRESETS = [

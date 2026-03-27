@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { STORAGE_KEYS } from "../utils/constants";
 
@@ -35,11 +35,6 @@ export const ChannelProvider = ({ children }) => {
   const [selectedGroup, setSelectedGroup] = useState("all");
   const [timer, setTimer] = useLocalStorage(STORAGE_KEYS.SLEEP_TIMER, null); // in minutes or null for off;
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
-
-  // Add countdown state and ref
-  const [remainingTime, setRemainingTime] = useState(null); // in milliseconds
-  const timerRef = useRef(null);
-  const countdownIntervalRef = useRef(null);
 
   // Get unique groups from channels
   const groups = [
@@ -99,19 +94,9 @@ export const ChannelProvider = ({ children }) => {
   // stop playing
   const stopPlaying = () => {
     addToHistory(currentChannel);
+
     setCurrentChannel(null);
     setTimer(null);
-    setRemainingTime(null);
-
-    // Clear intervals
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
   };
 
   // Navigation
@@ -133,61 +118,6 @@ export const ChannelProvider = ({ children }) => {
     }
   };
 
-  // Update timer when timer value changes
-  useEffect(() => {
-    // Clear existing timer and countdown
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-
-    if (timer && timer > 0) {
-      // Set initial remaining time in milliseconds
-      const initialRemaining = timer * 60 * 1000;
-      setRemainingTime(initialRemaining);
-
-      // Set timeout to stop playing
-      timerRef.current = setTimeout(() => {
-        stopPlaying();
-      }, initialRemaining);
-
-      // Set interval to update countdown
-      countdownIntervalRef.current = setInterval(() => {
-        setRemainingTime((prev) => {
-          if (prev && prev > 1000) {
-            return prev - 1000;
-          } else {
-            // Clear interval when time is up
-            if (countdownIntervalRef.current) {
-              clearInterval(countdownIntervalRef.current);
-              countdownIntervalRef.current = null;
-            }
-            return 0;
-          }
-        });
-      }, 1000);
-    } else {
-      setRemainingTime(null);
-    }
-
-    // Cleanup function
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-        countdownIntervalRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timer]);
-
   // Load last channel on mount
   useEffect(() => {
     if (lastChannel && !currentChannel) {
@@ -196,18 +126,21 @@ export const ChannelProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastChannel]);
 
-  // Helper function to format remaining time
-  const formatRemainingTime = () => {
-    if (!remainingTime || remainingTime <= 0) return null;
-
-    const minutes = Math.floor(remainingTime / 60000);
-    const seconds = Math.floor((remainingTime % 60000) / 1000);
-
-    if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
+  // load none on timeout
+  useEffect(() => {
+    if (timer) {
+      const stopTimeout = setTimeout(
+        () => {
+          stopPlaying();
+        },
+        timer * 60 * 1000,
+      );
+      return () => {
+        clearTimeout(stopTimeout);
+      };
     }
-    return `${seconds}s`;
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer]);
 
   return (
     <ChannelContext.Provider
@@ -236,8 +169,6 @@ export const ChannelProvider = ({ children }) => {
         history,
         clearHistory,
         lastChannel,
-        remainingTime,
-        formatRemainingTime,
       }}
     >
       {children}
